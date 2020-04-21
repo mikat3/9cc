@@ -4,3 +4,7 @@ tmp*
 a.out
 9cc
 
+[url "github:"]
+    InsteadOf = https://github.com/
+    InsteadOf = git@github.com:
+
