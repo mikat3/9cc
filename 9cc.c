@@ -49,7 +49,6 @@ void error_at(char *loc, char *fmt, ...) {
   va_start(ap, fmt);
 
   int pos = loc - user_input;
-fprintf(stderr, "pos = %d\n", pos);
   fprintf(stderr, "%s\n", user_input);
   fprintf(stderr, "%*s", pos, ""); // pos個の空白を出力
   fprintf(stderr, "^ ");
@@ -224,9 +223,9 @@ Node *primary(void) {
 
 Node *unary(void) {
   if (consume("+"))
-    return primary();
+    return unary();    // Fixed unary() <- primary()
   if (consume("-"))
-    return new_node(ND_SUB, new_node_num(0), primary());
+    return new_node(ND_SUB, new_node_num(0), unary()); // Fixed unary() <- primary()
   return primary();
 }
 

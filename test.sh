@@ -26,8 +26,8 @@ assert 15 '5*(9-6)'
 assert 4 '(3+5)/2'
 assert 10 '-10+20'
 
-# assert 10 '- -10'
-# assert 10 '- -10 +10'
+assert 10 '- -10'
+assert 10 '- - +10'
 
 assert 120 '-(3+5)*-3*+5'
 
