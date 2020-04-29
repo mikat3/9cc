@@ -61,7 +61,7 @@ struct Node {
 // variable declaration
 extern char *user_input;
 extern Token *token;
-//extern Node *code[100];
+extern Node *code[100];
 
 // function declaration
 void error(char *fmt, ...);
