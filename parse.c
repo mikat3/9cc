@@ -14,6 +14,14 @@ bool consume(char *op) {
   return true;
 }
 
+// for トークンの種別
+bool consume_kind(TokenKind kind) {
+  if (token->kind != kind) 
+    return false;
+  token = token->next;
+  return true;
+}
+
 // for 識別子
 Token *consume_ident(void) {
   Token *tok = token;
@@ -61,6 +69,14 @@ bool startswith(char *p, char *q) {
   return memcmp(p, q, strlen(q)) == 0;
 }
 
+// トークンを構成する文字か判定
+int is_alnum(char c) {
+  return ('a' <= c && c <= 'z') ||
+         ('A' <= c && c <= 'Z') ||
+         ('0' <= c && c <= '9') ||
+         (c == '_');
+}
+
 // 入力文字列pをトークナイズしてそれを返す
 Token *tokenize(char *p) {
   Token head;
@@ -89,6 +105,17 @@ Token *tokenize(char *p) {
       continue;
     }
 
+    // Keyword token punctuator
+    if (strncmp(p, "return", 6) == 0 && !is_alnum(p[6])) {
+      cur = new_token(TK_RETURN, cur, p, 6);
+      //tokens[i].ty = TK_RETURN;
+      //tokens[i].str = p;
+      //i++;
+      p += 6;
+      continue;
+    }
+
+    // Identifier punctuator
     if ('a' <= *p && *p <= 'z') {
       cur = new_token(TK_IDENT, cur, p, 0);
       char *q = p++;
@@ -150,7 +177,7 @@ LVar *find_lvar(Token *tok) {
 
 // ↓並びが優先度順位になる(下位:優先度高)
 // program    = stmt*
-// stmt       = expr ";"
+// stmt       = expr ";" | "return" expr ";"
 // expr       = assign
 // assign     = equality ("=" assign)?
 // equality   = relational ("==" relational | "!=" relational)*
@@ -268,7 +295,13 @@ Node *expr(void) {
 }
 
 Node *stmt(void) {
-  Node *node = expr();
+  Node *node = NULL;
+
+  if (consume_kind(TK_RETURN)) 
+    node = new_binary(ND_RETURN, expr(), node);
+  else
+    node = expr(); 
+
   expect(";");
   return node;
 }
