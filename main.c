@@ -19,7 +19,6 @@ int main(int argc, char **argv) {
   printf(".global main\n");
   printf("main:\n");
 
-#if 1
   // 抽象構文木を下りながらコード生成
   // Traverse the AST(Abstruct Syntax Tree) to emit assembly.
   gen(node);
@@ -30,26 +29,6 @@ int main(int argc, char **argv) {
   // to RAX to make it a program exit code.
   printf("  pop rax\n");
   printf("  ret\n");
-
-#else
-  // 式の最初は数でなければならないので、それをチェックして
-  // 最初のmov命令を出力
-  printf("  mov rax, %d\n", expect_number());
-
-  // `+ <数>`あるいは`- <数>`というトークンの並びを消費しつつ
-  // アセンブリを出力
-  while (!at_eof()) {
-    if (consume('+')) {
-      printf("  add rax, %d\n", expect_number());
-      continue;
-    }
-
-    expect('-');
-    printf("  sub rax, %d\n", expect_number());
-  }
-
-  printf("  ret\n");
-#endif
 
   return 0;
 }

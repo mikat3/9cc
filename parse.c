@@ -14,6 +14,15 @@ bool consume(char *op) {
   return true;
 }
 
+//
+Token *consume_ident(void) {
+  Token *tok = token;
+  if (token->kind != TK_IDENT)
+    return 0;
+  token = token->next; 
+  return tok;
+}
+
 // 次のトークンが期待している記号のときには、トークンを1つ読み進める。
 // それ以外の場合にはエラーを報告する。
 void expect(char *op) {
@@ -75,8 +84,13 @@ Token *tokenize(char *p) {
     }
 
     // Single-letter punctuator
-    if (strchr("+-*/()<>", *p)) {
+    if (strchr("+-*/()<>=", *p)) {
       cur = new_token(TK_RESERVED, cur, p++, 1);
+      continue;
+    }
+
+    if ('a' <= *p && *p <= 'z') {
+      cur = new_token(TK_IDENT, cur, p++, 1);
       continue;
     }
     //>>
@@ -96,29 +110,39 @@ Token *tokenize(char *p) {
   return head.next;
 }
 
-Node *new_node(NodeKind kind, Node *lhs, Node *rhs) {
+
+Node *code[100];    // Node list as parse result
+
+Node *new_node(NodeKind kind) {
   Node *node = calloc(1, sizeof(Node));
   node->kind = kind;
+  return node;
+}
+
+Node *new_binary(NodeKind kind, Node *lhs, Node *rhs) {
+  Node *node = new_node(kind);
   node->lhs = lhs;
   node->rhs = rhs;
   return node;
 }
 
-Node *new_node_num(int val) {
-  Node *node = calloc(1, sizeof(Node));
-  node->kind = ND_NUM;
+Node *new_num(int val) {
+  Node *node = new_node(ND_NUM);
   node->val = val;
   return node;
 }
 
 // ↓並びが優先度順位になる(下位:優先度高)
-// expr       = equality
+// program    = stmt*
+// stmt       = expr ";"
+// expr       = assign
+// assign     = equality ("=" assign)?
 // equality   = relational ("==" relational | "!=" relational)*
 // relational = add ("<" add | "<=" add | ">" add | ">=" add)*
 // add        = mul ("+" mul | "-" mul)*
 // mul        = unary ("*" unary | "/" unary)*
 // unary      = ("+" | "-")? primary
-// primary    = num | "(" expr ")"
+// primary    = num | ident | "(" expr ")"
 
 Node *primary(void) {
   // 次のトークンが"("なら、"(" expr ")"のはず
@@ -127,16 +151,23 @@ Node *primary(void) {
     expect(")");
     return node;
   }
-
+  // トークンが識別子(ident)ならRBPからのオフセットを格納
+  Token *tok = consume_ident();
+  if (tok) {
+    Node *node = calloc(1, sizeof(Node));
+    node->kind = ND_LVAR;
+    node->offset = (tok->str[0] - 'a' + 1) * 8;
+    return node;
+  }
   // そうでなければ数値のはず
-  return new_node_num(expect_number());
+  return new_num(expect_number());
 }
 
 Node *unary(void) {
   if (consume("+"))
     return unary();    // Fixed unary() <- primary()
   if (consume("-"))
-    return new_node(ND_SUB, new_node_num(0), unary()); // Fixed unary() <- primary()
+    return new_binary(ND_SUB, new_num(0), unary()); // Fixed unary() <- primary()
   return primary();
 }
 
@@ -145,9 +176,9 @@ Node *mul(void) {
 
   for (;;) {
     if (consume("*"))
-      node = new_node(ND_MUL, node, unary());
+      node = new_binary(ND_MUL, node, unary());
     else if (consume("/"))
-      node = new_node(ND_DIV, node, unary());
+      node = new_binary(ND_DIV, node, unary());
     else
       return node;
   }
@@ -158,9 +189,9 @@ Node *add(void) {
 
   for (;;) {
     if (consume("+"))
-      node = new_node(ND_ADD, node, mul());
+      node = new_binary(ND_ADD, node, mul());
     else if (consume("-"))
-      node = new_node(ND_SUB, node, mul());
+      node = new_binary(ND_SUB, node, mul());
     else
       return node;
   }
@@ -171,13 +202,13 @@ Node *relational(void) {
 
   for (;;) {
     if (consume("<"))
-      node = new_node(ND_LT, node, add());
+      node = new_binary(ND_LT, node, add());
     else if (consume("<="))
-      node = new_node(ND_LE, node, add());
+      node = new_binary(ND_LE, node, add());
     else if (consume(">"))
-      node = new_node(ND_LT, add(), node);
+      node = new_binary(ND_LT, add(), node);
     else if (consume(">="))
-      node = new_node(ND_LE, add(), node);
+      node = new_binary(ND_LE, add(), node);
     else
       return node;
   }
@@ -188,16 +219,35 @@ Node *equality(void) {
 
   for (;;) {
     if (consume("=="))
-      node = new_node(ND_EQ, node, relational());
+      node = new_binary(ND_EQ, node, relational());
     else if (consume("!="))
-      node = new_node(ND_NE, node, relational());
+      node = new_binary(ND_NE, node, relational());
     else
       return node;
   }
 }
 
-Node *expr(void) {
-  return equality();
+Node *assign(void) {
+  Node *node = equality();
+  if (consume("="))
+    node = new_binary(ND_ASSIGN, node, assign());
+  return node;
 }
 
+Node *expr(void) {
+  return assign();
+}
+
+Node *stmt(void) {
+  Node *node = expr();
+  expect(";");
+  return node;
+}
+
+void program(void) {
+  int i = 0;
+  while (!at_eof())
+    code[i++] = stmt();
+  code[i] = NULL;
+}
 
